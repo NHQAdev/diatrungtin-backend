@@ -147,6 +147,8 @@ try {
     ['huong-dan-mua-hang', 'Hướng dẫn mua hàng'],
     ['huong-dan-do-size', 'Hướng dẫn đo kích thước vòng tay'],
     ['gioi-thieu', 'Giới thiệu'],
+    ['su-dung-bao-quan', 'Sử dụng & bảo quản trầm hương'],
+    ['chon-nhang-cay-hay-nhang-nu', 'Chọn nhang cây hay nhang nụ'],
   ] as const) {
     await db
       .insertInto('pages')
@@ -154,7 +156,7 @@ try {
       .onConflict((oc) => oc.column('slug').doNothing())
       .execute();
   }
-  console.log('Đã đặt thông tin cửa hàng và 6 trang nội dung TẠM (ghi [Cập nhật]). Phí giao hàng tạm: 30.000 ₫, miễn phí từ 1.000.000 ₫.');
+  console.log('Đã đặt thông tin cửa hàng và 8 trang nội dung TẠM (ghi [Cập nhật]). Phí giao hàng tạm: 30.000 ₫, miễn phí từ 1.000.000 ₫.');
   console.log('Seed xong.');
 } catch (error) {
   console.error(error);
