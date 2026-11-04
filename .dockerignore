@@ -1,0 +1,12 @@
+node_modules
+dist
+uploads
+coverage
+.git
+.env
+.env.*
+deploy/.env
+tests
+*.log
+cookie.txt
+login.json

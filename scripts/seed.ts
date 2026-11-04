@@ -117,10 +117,44 @@ try {
     console.log('Đã tạo 2 sản phẩm [Mẫu].');
   }
 
-  const settings = await db.selectFrom('store_settings').select('shipping_fee').where('id', '=', 1).executeTakeFirstOrThrow();
-  if (settings.shipping_fee === null) {
-    console.log('Lưu ý: chưa cấu hình phí giao hàng nên checkout sẽ bị từ chối. Đặt bằng PUT /api/admin/store-settings.');
+  // Placeholder ("scribble") store info so the frontend has something to show. Every value is
+  // obviously temporary and must be replaced in the admin before launch. Existing values are kept.
+  const settings = await db.selectFrom('store_settings').selectAll().where('id', '=', 1).executeTakeFirstOrThrow();
+  await db
+    .updateTable('store_settings')
+    .set({
+      hotline: settings.hotline ?? '0900 000 000 [Cập nhật]',
+      email: settings.email ?? 'lienhe@example.com [Cập nhật]',
+      address: settings.address ?? 'Số 00, Đường Mẫu, Phường Mẫu, Tỉnh Mẫu [Cập nhật]',
+      business_info: settings.business_info ?? 'Tên doanh nghiệp, mã số thuế, giấy phép kinh doanh [Cập nhật]',
+      facebook_url: settings.facebook_url ?? 'https://facebook.com/ [Cập nhật]',
+      zalo_url: settings.zalo_url ?? 'https://zalo.me/ [Cập nhật]',
+      // Development only: lets checkout work locally. Set the real fee in the admin.
+      shipping_fee: settings.shipping_fee ?? 30_000,
+      free_shipping_threshold: settings.free_shipping_threshold ?? 1_000_000,
+    })
+    .where('id', '=', 1)
+    .execute();
+
+  const scribble =
+    '[Nội dung tạm — cần cập nhật trước khi mở bán]\n\n' +
+    'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n\n' +
+    'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.';
+  for (const [slug, title] of [
+    ['chinh-sach-doi-tra', 'Chính sách đổi trả'],
+    ['chinh-sach-giao-hang', 'Chính sách giao hàng'],
+    ['chinh-sach-bao-mat', 'Chính sách bảo mật'],
+    ['huong-dan-mua-hang', 'Hướng dẫn mua hàng'],
+    ['huong-dan-do-size', 'Hướng dẫn đo kích thước vòng tay'],
+    ['gioi-thieu', 'Giới thiệu'],
+  ] as const) {
+    await db
+      .insertInto('pages')
+      .values({ slug, title, content: scribble, is_published: true })
+      .onConflict((oc) => oc.column('slug').doNothing())
+      .execute();
   }
+  console.log('Đã đặt thông tin cửa hàng và 6 trang nội dung TẠM (ghi [Cập nhật]). Phí giao hàng tạm: 30.000 ₫, miễn phí từ 1.000.000 ₫.');
   console.log('Seed xong.');
 } catch (error) {
   console.error(error);

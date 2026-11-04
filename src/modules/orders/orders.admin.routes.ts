@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify';
+import { sql } from 'kysely';
 import { z } from 'zod';
 import type { Db } from '../../db/client.js';
 import { notFound } from '../../lib/errors.js';
-import { IdParam, pageMeta } from '../../lib/http.js';
+import { emailSchema, IdParam, optionalText, pageMeta, phoneSchema, unaccentPattern } from '../../lib/http.js';
 import { requireAdmin } from '../admin-auth/require-admin.js';
 import { availableActions } from './order-state.js';
-import { applyAdminAction, getOrderItems } from './orders.service.js';
+import { applyAdminAction, getOrderItems, updateOrderDetails } from './orders.service.js';
 
 const ListQuery = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -26,6 +27,17 @@ const ActionBody = z.object({
   note: z.string().trim().max(1000).optional(),
 });
 
+const DetailsBody = z.object({
+  customerName: z.string().trim().min(1).max(200).optional(),
+  phone: phoneSchema.optional(),
+  email: emailSchema.optional(),
+  shippingProvince: z.string().trim().min(1).max(100).optional(),
+  shippingWard: z.string().trim().min(1).max(100).optional(),
+  shippingAddressLine: z.string().trim().min(1).max(300).optional(),
+  note: optionalText(1000).optional(),
+  reason: z.string().trim().min(1, 'Vui lòng ghi lý do sửa (ví dụ: khách gọi đổi địa chỉ).').max(500),
+});
+
 export function adminOrderRoutes(deps: { db: Db }) {
   const { db } = deps;
 
@@ -38,7 +50,7 @@ export function adminOrderRoutes(deps: { db: Db }) {
       if (query.q) {
         const pattern = `%${query.q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
         base = base.where((eb) =>
-          eb.or([eb('code', 'ilike', pattern), eb('phone', 'like', pattern), eb('email', 'ilike', pattern), eb('customer_name', 'ilike', pattern)]),
+          eb.or([eb('code', 'ilike', pattern), eb('phone', 'like', pattern), eb('email', 'ilike', pattern), sql<boolean>`vn_unaccent(customer_name) like ${unaccentPattern(query.q!)}`]),
         );
       }
       if (query.orderStatus) base = base.where('order_status', '=', query.orderStatus);
@@ -93,6 +105,14 @@ export function adminOrderRoutes(deps: { db: Db }) {
           availableActions: availableActions(order),
         },
       };
+    });
+
+    app.patch('/orders/:id/details', async (request) => {
+      const { id } = IdParam.parse(request.params);
+      const body = DetailsBody.parse(request.body);
+      const order = await updateOrderDetails(db, id, body, request.admin!.id);
+      const { access_token_hash: _secret, ...safeOrder } = order;
+      return { data: safeOrder };
     });
   };
 }

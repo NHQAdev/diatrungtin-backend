@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { sql } from 'kysely';
 import type { FastifyInstance } from 'fastify';
 import { buildApp } from '../src/app.js';
@@ -14,6 +16,9 @@ export async function createTestContext(): Promise<{ app: FastifyInstance; db: D
     DATABASE_URL: process.env.TEST_DATABASE_URL,
     CORS_ORIGINS: ALLOWED_ORIGIN,
     COOKIE_SECURE: 'false',
+    // Uploaded test images go to a temporary folder, never into the project.
+    UPLOAD_DIR: path.join(tmpdir(), 'dtt-test-uploads'),
+    UPLOAD_MAX_MB: '1',
   });
   const db = createDb(env.DATABASE_URL, 5);
   const app = await buildApp({ env, db });

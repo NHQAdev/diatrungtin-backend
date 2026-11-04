@@ -55,6 +55,23 @@ describe('public catalog', () => {
     expect(await count('q=%25')).toBe(0);
   });
 
+  it('searches without accents and ignores letter case', async () => {
+    const count = async (q: string) => (await call(app, { url: `/api/products?q=${encodeURIComponent(q)}` })).json().meta.total;
+    expect(await count('vong tay')).toBe(1);
+    expect(await count('VÒNG TAY')).toBe(1);
+    expect(await count('trầm 108')).toBe(1);
+    expect(await count('tram 108 hat')).toBe(1);
+    expect(await count('Vòng tay'.normalize('NFD'))).toBe(1);
+    expect(await count('vong co')).toBe(0);
+    // The search text follows renames automatically.
+    await call(app, { method: 'PATCH', url: `/api/admin/products/${catalog.productId}`, cookie: admin, payload: { name: 'Chuỗi hạt đặc biệt' } });
+    expect(await count('chuoi hat dac biet')).toBe(1);
+    expect(await count('vong tay')).toBe(0);
+    // Admin search: by name without accents, or by SKU.
+    expect((await call(app, { url: '/api/admin/products?q=chuoi%20hat', cookie: admin })).json().meta.total).toBe(1);
+    expect((await call(app, { url: '/api/admin/products?q=vt-108-10', cookie: admin })).json().meta.total).toBe(1);
+  });
+
   it('shows variant details without exposing the exact warehouse stock', async () => {
     const response = await call(app, { url: `/api/products/${catalog.slug}` });
     expect(response.statusCode).toBe(200);

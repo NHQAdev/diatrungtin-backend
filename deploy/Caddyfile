@@ -1,0 +1,13 @@
+# Caddy gets and renews the HTTPS certificate for API_DOMAIN automatically (Let's Encrypt).
+# The DNS A record of API_DOMAIN must point to this VPS before the first start.
+{$API_DOMAIN} {
+	encode gzip
+	reverse_proxy api:4000
+}
+
+# The shop frontend will be added here later, e.g.:
+# {$APP_DOMAIN} {
+# 	root * /srv/frontend
+# 	try_files {path} /index.html
+# 	file_server
+# }

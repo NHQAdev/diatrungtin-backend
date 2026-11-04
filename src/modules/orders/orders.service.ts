@@ -393,3 +393,69 @@ export async function applyAdminAction(db: Db, orderId: string, input: AdminActi
     return updated;
   });
 }
+
+// ---------- admin: edit contact / shipping details ----------
+
+export interface OrderDetailsInput {
+  customerName?: string;
+  phone?: string;
+  email?: string;
+  shippingProvince?: string;
+  shippingWard?: string;
+  shippingAddressLine?: string;
+  note?: string | null;
+  reason: string;
+}
+
+const EDITABLE_FIELDS = {
+  customerName: { column: 'customer_name', label: 'Tên người nhận' },
+  phone: { column: 'phone', label: 'Số điện thoại' },
+  email: { column: 'email', label: 'Email' },
+  shippingProvince: { column: 'shipping_province', label: 'Tỉnh/thành' },
+  shippingWard: { column: 'shipping_ward', label: 'Phường/xã' },
+  shippingAddressLine: { column: 'shipping_address_line', label: 'Địa chỉ' },
+  note: { column: 'note', label: 'Ghi chú' },
+} as const;
+
+/**
+ * The customer called to change their phone or address. Allowed until the parcel leaves the shop.
+ * Items and money are never changed here: cancel and re-order for that.
+ */
+export async function updateOrderDetails(db: Db, orderId: string, input: OrderDetailsInput, adminId: string): Promise<Order> {
+  return db.transaction().execute(async (trx) => {
+    const order = await trx.selectFrom('orders').selectAll().where('id', '=', orderId).forUpdate().executeTakeFirst();
+    if (!order) throw notFound('Không tìm thấy đơn hàng.');
+
+    const editable =
+      (order.order_status === 'pending' || order.order_status === 'confirmed') &&
+      (order.fulfillment_status === 'unfulfilled' || order.fulfillment_status === 'packing');
+    if (!editable) {
+      throw new AppError(409, 'INVALID_STATUS_TRANSITION', 'Đơn đã giao cho vận chuyển hoặc đã kết thúc, không thể sửa thông tin nhận hàng.');
+    }
+
+    // New values: what the admin sent, or the current value when a field was not sent.
+    const next = {
+      customer_name: input.customerName ?? order.customer_name,
+      phone: input.phone ?? order.phone,
+      email: input.email ?? order.email,
+      shipping_province: input.shippingProvince ?? order.shipping_province,
+      shipping_ward: input.shippingWard ?? order.shipping_ward,
+      shipping_address_line: input.shippingAddressLine ?? order.shipping_address_line,
+      note: input.note !== undefined ? input.note : order.note,
+    };
+    const descriptions = Object.values(EDITABLE_FIELDS)
+      .filter((field) => next[field.column] !== order[field.column])
+      .map((field) => `${field.label}: "${order[field.column] ?? ''}" → "${next[field.column] ?? ''}"`);
+    if (descriptions.length === 0) return order;
+
+    const updated = await trx
+      .updateTable('orders')
+      .set({ ...next, updated_at: sql`now()` })
+      .where('id', '=', orderId)
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    // History keeps both the reason and the old → new values.
+    await addEvent(trx, updated, { type: 'admin', id: adminId }, 'details_updated', `${input.reason}. ${descriptions.join('; ')}`);
+    return updated;
+  });
+}

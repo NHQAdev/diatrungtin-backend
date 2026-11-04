@@ -63,6 +63,8 @@ npm run admin -- disable --email a@b.vn          # khóa và thu hồi mọi phi
 
 Tự động hóa (CI, lần triển khai đầu): đặt `ADMIN_PASSWORD` trong môi trường thay vì nhập tay. Không ghi mật khẩu vào file hay lịch sử shell.
 
-## Triển khai (tóm tắt)
+## Triển khai
 
-`npm ci && npm run build && npm run db:migrate && npm start` (không chạy `db:seed` trên production), với `NODE_ENV=production`, `CORS_ORIGINS` là domain frontend, `TRUST_PROXY=true` nếu chạy sau reverse proxy. Health check: `/health/ready`.
+Lên VPS bằng Docker Compose (PostgreSQL + API + Caddy HTTPS), kèm sao lưu/khôi phục: xem [docs/DEPLOY.md](docs/DEPLOY.md).
+
+Không dùng Docker: `npm ci && npm run build && npm run db:migrate:prod && npm start` (tạo admin: `npm run admin:prod -- create …`), với `NODE_ENV=production`. Không chạy `db:seed` trên production.

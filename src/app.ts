@@ -12,6 +12,7 @@ import { adminCustomerRoutes } from './modules/admin-customers/admin-customers.r
 import { catalogAdminRoutes } from './modules/catalog/catalog.admin.routes.js';
 import { catalogPublicRoutes } from './modules/catalog/catalog.public.routes.js';
 import { customerAuthRoutes } from './modules/customer-auth/customer-auth.routes.js';
+import { emailAdminRoutes } from './modules/email/email.admin.routes.js';
 import { healthRoutes } from './modules/health/health.routes.js';
 import { adminOrderRoutes } from './modules/orders/orders.admin.routes.js';
 import { orderRoutes } from './modules/orders/orders.routes.js';
@@ -101,6 +102,7 @@ export async function buildApp({ env, db }: AppDeps): Promise<FastifyInstance> {
   await app.register(adminCustomerRoutes({ db }), { prefix: '/api/admin' });
   await app.register(adminOrderRoutes({ db }), { prefix: '/api/admin' });
   await app.register(storeAdminRoutes({ db }), { prefix: '/api/admin' });
+  await app.register(emailAdminRoutes({ db }), { prefix: '/api/admin' });
 
   return app;
 }

@@ -1,0 +1,60 @@
+# Production stack on one VPS: PostgreSQL + API + Caddy (automatic HTTPS).
+# Run every command from this folder:  cd deploy && docker compose ...
+# Settings come from deploy/.env (copy .env.example). See docs/DEPLOY.md.
+
+name: diatrungtin
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-diatrungtin}
+      POSTGRES_USER: ${POSTGRES_USER:-diatrungtin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # No "ports:": the database is only reachable from the other containers, never from the internet.
+
+  api:
+    build: ..
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 4000
+      DATABASE_URL: postgres://${POSTGRES_USER:-diatrungtin}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-diatrungtin}
+      UPLOAD_DIR: /app/uploads
+      TRUST_PROXY: "true"
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?Set API_DOMAIN in deploy/.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  uploads:
+  caddy_data:
+  caddy_config:

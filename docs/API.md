@@ -33,7 +33,7 @@ Giá trả về theo **người đang xem**: khách business đã được duy�
 | GET | `/api/categories` | Cây danh mục (cha → con) |
 | GET | `/api/collections` | Bộ sưu tập đang hiển thị |
 | GET | `/api/tags?type=audience\|need` | Thẻ lọc đối tượng / nhu cầu |
-| GET | `/api/products` | Danh sách. Query: `q`, `category` (slug, gồm cả danh mục con), `collection`, `audience=a,b`, `need=a,b`, `minPrice`, `maxPrice`, `inStock=true`, `sort=newest\|price_asc\|price_desc\|name_asc`, `page`, `pageSize` |
+| GET | `/api/products` | Danh sách. Query: `q` (không phân biệt dấu/hoa thường: "vong tay" = "Vòng tay"), `category` (slug, gồm cả danh mục con), `collection`, `audience=a,b`, `need=a,b`, `minPrice`, `maxPrice`, `inStock=true`, `sort=newest\|price_asc\|price_desc\|name_asc`, `page`, `pageSize` |
 | GET | `/api/products/:slug` | Chi tiết: breadcrumb, ảnh, thông số, tag, bộ sưu tập, `variants[]` |
 
 Mỗi phần tử `variants[]`: `{ id, sku, name, options, price, retailPrice, inStock, availableQuantity (≤ 99), maxExtraBeads, extraBeadPrice }`. Nút mua chỉ bật khi đã chọn một variant có `inStock`. Nếu `maxExtraBeads > 0`, cho chọn 0…`maxExtraBeads` hạt thêm; giá dòng = `(price + extraBeads × extraBeadPrice) × quantity`.
@@ -157,6 +157,7 @@ Variant body: `{ sku, name, options: { bead_size_mm: 8 }, retailPrice, businessP
 | GET | `/api/admin/orders` | `q` (mã, SĐT, email, tên), `orderStatus`, `paymentStatus`, `fulfillmentStatus`, `from`, `to` |
 | GET | `/api/admin/orders/:id` | Đơn + dòng hàng + lịch sử (`events`) + `availableActions` |
 | POST | `/api/admin/orders/:id/actions` | `{ action, carrier?, trackingNumber?, reason?, note? }` |
+| PATCH | `/api/admin/orders/:id/details` | Sửa thông tin nhận hàng: `{ customerName?, phone?, email?, shippingProvince?, shippingWard?, shippingAddressLine?, note?, reason }` — `reason` bắt buộc; chỉ khi đơn chưa giao cho vận chuyển; lịch sử lưu giá trị cũ → mới. Không sửa sản phẩm/tiền |
 
 Hành động hợp lệ (frontend chỉ hiện nút có trong `availableActions`):
 
@@ -171,3 +172,10 @@ Hành động hợp lệ (frontend chỉ hiện nút có trong `availableActions
 | `cancel` | `pending`/`confirmed` + `unfulfilled`/`packing`; bắt buộc `reason` | `cancelled`, hoàn tồn đúng 1 lần, email khách |
 | `mark_returned` | `confirmed` + `shipped`/`delivered`; bắt buộc `reason` | `cancelled` + `returned`, hoàn tồn |
 | `mark_refunded` | `cancelled` + `paid` | `refunded` |
+
+### Email
+
+| Method | Path | Ghi chú |
+|---|---|---|
+| GET | `/api/admin/emails?status=failed\|pending\|sent` | Danh sách email (không trả nội dung vì email đặt lại mật khẩu chứa link bí mật) |
+| POST | `/api/admin/emails/:id/retry` | Gửi lại email đang lỗi (sau khi sửa cấu hình SMTP) |

@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { sql } from 'kysely';
 import type { Db } from '../../db/client.js';
 import { conflict, isForeignKeyViolation, isUniqueViolation, notFound } from '../../lib/errors.js';
-import { IdParam, PaginationQuery, pageMeta } from '../../lib/http.js';
+import { IdParam, PaginationQuery, pageMeta, unaccentPattern } from '../../lib/http.js';
 import { slugify } from '../../lib/slug.js';
 import { requireAdmin } from '../admin-auth/require-admin.js';
 import {
@@ -222,7 +222,7 @@ export function catalogAdminRoutes(deps: { db: Db }) {
         // Search by product name or by any of its SKUs.
         base = base.where((eb) =>
           eb.or([
-            eb('p.name', 'ilike', pattern),
+            sql<boolean>`p.search_text like ${unaccentPattern(query.q!)}`,
             eb.exists(eb.selectFrom('product_variants as v').select('v.id').whereRef('v.product_id', '=', 'p.id').where('v.sku', 'ilike', pattern)),
           ]),
         );

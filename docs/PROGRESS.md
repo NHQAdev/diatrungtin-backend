@@ -16,16 +16,26 @@ Cập nhật: 2026-11-04.
 | Cửa hàng | Thông tin cửa hàng, phí giao hàng đồng giá + ngưỡng miễn phí, trang nội dung/chính sách, dashboard admin |
 | Seed | Danh mục, bộ sưu tập, tag và 2 sản phẩm **[Mẫu]** |
 
-## Đã kiểm tra (2026-11-05)
+## Bổ sung ngày 2026-11-05
 
-- **81/81 test tích hợp qua** trên PostgreSQL 16 thật (`tests/*.test.ts`): xác thực admin, phân quyền admin, catalog (lọc, ẩn, validation, tồn kho), tài khoản khách (đăng ký, giá business chỉ sau khi duyệt, đặt lại mật khẩu dùng 1 lần), báo giá, tạo đơn, idempotency, 5 khách tranh món cuối, 2 đơn ngược thứ tự không deadlock, hủy lặp chỉ hoàn tồn 1 lần, máy trạng thái COD, quyền xem đơn, email outbox, migrator CRLF/LF.
-- Kiểm chứng test có tác dụng: bỏ `FOR UPDATE` → test tranh chấp fail; bỏ điều kiện `stock_restored_at IS NULL` → test hủy lặp fail.
-- Cách chạy lúc kiểm tra: Node 22 tự dịch TypeScript + lớp tương thích vitest trên `node:test` (môi trường kiểm tra không có npm). Trên máy dev, chạy bằng `npm test` (vitest thật).
-- `tsc --noEmit`: không lỗi ngoài "không tìm thấy module" của `nodemailer`, `@fastify/multipart` (hết sau `npm install`).
+- Tìm kiếm không dấu (migration `0006_search.sql`, hàm `vn_unaccent`, cột `products.search_text` do PostgreSQL tự cập nhật); áp dụng cho tìm sản phẩm, tìm đơn theo tên, tìm khách.
+- Admin sửa thông tin nhận hàng của đơn (bắt buộc lý do, lưu cũ → mới trong lịch sử).
+- Admin xem email gửi lỗi và gửi lại.
+- Tác vụ dọn dữ liệu cũ mỗi 6 giờ (phiên, token, khóa chống lặp, email đã gửi).
+- Lệnh production `db:migrate:prod`, `admin:prod`; `Dockerfile`; `deploy/` (Compose + Caddy, `backup.sh`, `restore.sh`, `.env.example`); [DEPLOY.md](DEPLOY.md).
+- Seed: thông tin cửa hàng và 6 trang chính sách **tạm** (ghi [Cập nhật]), phí giao hàng tạm cho môi trường dev.
+
+## Đã kiểm tra
+
+- **92/92 test qua** trên PostgreSQL 16 thật, dùng `nodemailer` và `@fastify/multipart` thật (lấy từ `node_modules` của máy dev), chạy bằng Node 22 + lớp tương thích vitest trên `node:test`.
+- Test có tác dụng: bỏ `FOR UPDATE` → test tranh chấp fail; bỏ điều kiện hoàn tồn 1 lần → test hủy lặp fail.
+- `tsc --noEmit` toàn dự án: 0 lỗi. `npm run build` → chạy từ `dist/`: migrate (2 lần, lần 2 không làm gì), tạo admin, khởi động server ở `NODE_ENV=production`, `/health/ready` ok, cookie có `Secure`.
+- `docker compose config` hợp lệ; cú pháp `backup.sh`/`restore.sh` hợp lệ.
 
 ## Chưa kiểm tra
 
-- Upload ảnh (`POST /api/admin/uploads`) và gửi email qua SMTP thật: cần `@fastify/multipart`/`nodemailer` đã cài và một SMTP thử nghiệm.
+- Chưa build Docker image và chưa chạy stack Compose (môi trường kiểm tra không có Docker daemon). Lần đầu triển khai cần chạy thử theo DEPLOY.md.
+- Chưa gửi email qua SMTP thật.
 - Chưa chạy `npm test` bằng vitest thật trên máy dev.
 
 ## Ngoài phạm vi / backlog

@@ -7,10 +7,12 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { runMigrations } from '../src/db/migrator.js';
 import { sendPendingEmails } from '../src/modules/email/email-worker.js';
 import { enqueueEmail } from '../src/modules/email/outbox.js';
+import { runCleanup } from '../src/modules/maintenance/cleanup.js';
+import { adminCookie, call } from './fixtures.js';
 import { createTestContext, resetData } from './helpers.js';
 
 const ctx = await createTestContext();
-const { db } = ctx;
+const { app, db } = ctx;
 const silentLog = { warn: () => undefined, error: () => undefined, info: () => undefined } as unknown as FastifyBaseLogger;
 
 beforeEach(async () => {
@@ -76,3 +78,48 @@ describe('migrator', () => {
     await sql`DELETE FROM schema_migrations WHERE version = '9001_crlf_probe.sql'`.execute(db);
   });
 });
+
+describe('admin email monitor', () => {
+  it('lists failed emails without their body and can queue them again', async () => {
+    const admin = await adminCookie(app, db);
+    await enqueueEmail(db, { to: 'x@example.com', subject: 'Đặt lại mật khẩu', body: 'https://shop/dat-lai-mat-khau?token=SECRET' });
+    await sql`UPDATE email_outbox SET status = 'failed', attempts = 5, last_error = 'SMTP auth failed'`.execute(db);
+    const id = (await db.selectFrom('email_outbox').select('id').executeTakeFirstOrThrow()).id;
+
+    const list = await call(app, { url: '/api/admin/emails?status=failed', cookie: admin });
+    expect(list.json().meta.total).toBe(1);
+    expect(list.json().data[0]).toMatchObject({ to_email: 'x@example.com', last_error: 'SMTP auth failed', attempts: 5 });
+    expect(list.body).not.toMatch('SECRET');
+
+    expect((await call(app, { method: 'POST', url: `/api/admin/emails/${id}/retry`, cookie: admin })).json().data.status).toBe('pending');
+    const row = await db.selectFrom('email_outbox').selectAll().executeTakeFirstOrThrow();
+    expect(row).toMatchObject({ status: 'pending', attempts: 0, last_error: null });
+    // Only failed emails can be retried.
+    expect((await call(app, { method: 'POST', url: `/api/admin/emails/${id}/retry`, cookie: admin })).statusCode).toBe(409);
+    expect((await call(app, { url: '/api/admin/emails' })).statusCode).toBe(401);
+  });
+});
+
+describe('cleanup job', () => {
+  it('removes only old, finished data', async () => {
+    const admin = await adminCookie(app, db); // creates an active admin session
+    expect(admin).toMatch('dtt_admin_session');
+    const adminId = (await db.selectFrom('admin_users').select('id').executeTakeFirstOrThrow()).id;
+    const token = (n: number) => Buffer.alloc(32, n);
+    await db.insertInto('admin_sessions').values([
+      { admin_user_id: adminId, token_hash: token(1), created_at: sql`now() - interval '60 days'`, expires_at: sql`now() - interval '40 days'` },
+      { admin_user_id: adminId, token_hash: token(2), created_at: sql`now() - interval '10 days'`, expires_at: sql`now() - interval '5 days'` },
+    ]).execute();
+    await enqueueEmail(db, { to: 'old@example.com', subject: 'old', body: 'b' });
+    await enqueueEmail(db, { to: 'failed@example.com', subject: 'failed', body: 'b' });
+    await sql`UPDATE email_outbox SET status = 'sent', sent_at = now() - interval '100 days' WHERE to_email = 'old@example.com'`.execute(db);
+    await sql`UPDATE email_outbox SET status = 'failed', created_at = now() - interval '200 days' WHERE to_email = 'failed@example.com'`.execute(db);
+
+    const result = await runCleanup(db);
+    expect(result).toMatchObject({ adminSessions: 1, sentEmails: 1 });
+    // Kept: the live session, the recently expired one, and the failed email.
+    expect(await db.selectFrom('admin_sessions').select('id').execute()).toHaveLength(2);
+    expect((await db.selectFrom('email_outbox').select('to_email').execute()).map((r) => r.to_email)).toEqual(['failed@example.com']);
+  });
+});
+

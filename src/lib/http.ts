@@ -1,3 +1,4 @@
+import { type RawBuilder, sql } from 'kysely';
 import { z } from 'zod';
 
 // Shared helpers for request parsing and paginated responses.
@@ -53,3 +54,12 @@ export const optionalText = (max = 5000) =>
 
 /** Money in VND: a positive whole number. */
 export const moneySchema = z.number().int('Giá phải là số nguyên (VNĐ).').positive('Giá phải lớn hơn 0.').max(1_000_000_000_000);
+
+/**
+ * Accent-insensitive "contains" pattern for LIKE: "Vòng tay" and "vong tay" both become "%vong tay%".
+ * % and _ typed by the user are escaped so they match literally.
+ */
+export function unaccentPattern(text: string): RawBuilder<string> {
+  const escaped = text.replace(/[\\%_]/g, (char) => `\\${char}`);
+  return sql<string>`'%' || vn_unaccent(${escaped}) || '%'`;
+}

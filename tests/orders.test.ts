@@ -365,9 +365,51 @@ describe('admin order workflow', () => {
     expect(pending.meta.total).toBe(1);
     const search = (await call(app, { url: `/api/admin/orders?q=${second}`, cookie: admin })).json();
     expect(search.data[0].code).toBe(second);
+    const byName = (await call(app, { url: `/api/admin/orders?q=${encodeURIComponent('tran thi')}`, cookie: admin })).json();
+    expect(byName.meta.total).toBe(2);
 
     const dashboard = (await call(app, { url: '/api/admin/dashboard', cookie: admin })).json().data;
     expect(dashboard.orders).toMatchObject({ pending: 1, toShip: 1, today: 2 });
     expect(dashboard.lowStockVariants.map((v: { sku: string }) => v.sku).sort()).toEqual(['VT-108-10MM', 'VT-108-8MM']);
   });
 });
+
+describe('admin edits contact and shipping details', () => {
+  it('updates the address with a reason and records old → new values in the history', async () => {
+    const id = await orderIdByCode((await placeOrder([{ variantId: catalog.variantB, quantity: 1 }])).json().data.code);
+    const noReason = await call(app, { method: 'PATCH', url: `/api/admin/orders/${id}/details`, cookie: admin, payload: { phone: '0911111111' } });
+    expect(noReason.statusCode).toBe(400);
+
+    const response = await call(app, {
+      method: 'PATCH',
+      url: `/api/admin/orders/${id}/details`,
+      cookie: admin,
+      payload: { phone: '0911 111 111', shippingAddressLine: '99 Nguyễn Huệ', reason: 'Khách gọi đổi địa chỉ' },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().data).toMatchObject({ phone: '0911111111', shipping_address_line: '99 Nguyễn Huệ', total: 330_000 });
+    expect(response.json().data.access_token_hash).toBeUndefined();
+
+    const event = await db.selectFrom('order_events').selectAll().where('order_id', '=', id).where('action', '=', 'details_updated').executeTakeFirstOrThrow();
+    expect(event.note).toMatch('Khách gọi đổi địa chỉ');
+    expect(event.note).toMatch('"12 Lê Lợi" → "99 Nguyễn Huệ"');
+    expect(event.note).toMatch('"0987654321" → "0911111111"');
+  });
+
+  it('records nothing when no value actually changes', async () => {
+    const id = await orderIdByCode((await placeOrder([{ variantId: catalog.variantB, quantity: 1 }])).json().data.code);
+    await call(app, { method: 'PATCH', url: `/api/admin/orders/${id}/details`, cookie: admin, payload: { phone: '0987654321', reason: 'Kiểm tra' } });
+    expect(await db.selectFrom('order_events').selectAll().where('action', '=', 'details_updated').execute()).toHaveLength(0);
+  });
+
+  it('refuses edits once the parcel has shipped', async () => {
+    const id = await orderIdByCode((await placeOrder([{ variantId: catalog.variantB, quantity: 1 }])).json().data.code);
+    await adminAction(id, 'confirm');
+    await adminAction(id, 'start_packing');
+    expect((await call(app, { method: 'PATCH', url: `/api/admin/orders/${id}/details`, cookie: admin, payload: { shippingWard: 'Phường Mới', reason: 'Đổi' } })).statusCode).toBe(200);
+    await adminAction(id, 'ship', { carrier: 'GHN', trackingNumber: 'X1' });
+    const late = await call(app, { method: 'PATCH', url: `/api/admin/orders/${id}/details`, cookie: admin, payload: { shippingWard: 'Phường Khác', reason: 'Đổi' } });
+    expect(late.statusCode).toBe(409);
+  });
+});
+

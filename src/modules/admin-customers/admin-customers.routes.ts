@@ -3,7 +3,7 @@ import { sql } from 'kysely';
 import { z } from 'zod';
 import type { Db } from '../../db/client.js';
 import { AppError, notFound } from '../../lib/errors.js';
-import { IdParam, pageMeta } from '../../lib/http.js';
+import { IdParam, pageMeta, unaccentPattern } from '../../lib/http.js';
 import { requireAdmin } from '../admin-auth/require-admin.js';
 import { writeAuditLog } from '../audit/audit.service.js';
 import { enqueueEmail } from '../email/outbox.js';
@@ -46,7 +46,13 @@ export function adminCustomerRoutes(deps: { db: Db }) {
       if (query.q) {
         const pattern = `%${query.q.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
         base = base.where((eb) =>
-          eb.or([eb('email', 'ilike', pattern), eb('full_name', 'ilike', pattern), eb('phone', 'like', pattern), eb('tax_code', 'like', pattern), eb('company_name', 'ilike', pattern)]),
+          eb.or([
+            eb('email', 'ilike', pattern),
+            eb('phone', 'like', pattern),
+            eb('tax_code', 'like', pattern),
+            sql<boolean>`vn_unaccent(full_name) like ${unaccentPattern(query.q!)}`,
+            sql<boolean>`vn_unaccent(coalesce(company_name, '')) like ${unaccentPattern(query.q!)}`,
+          ]),
         );
       }
       if (query.accountType) base = base.where('account_type', '=', query.accountType);

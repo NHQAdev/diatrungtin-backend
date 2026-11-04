@@ -2,11 +2,14 @@ import { buildApp } from './app.js';
 import { loadEnv } from './config/env.js';
 import { createDb } from './db/client.js';
 import { startEmailWorker } from './modules/email/email-worker.js';
+import { startCleanupJob } from './modules/maintenance/cleanup.js';
 
 const env = loadEnv();
 const db = createDb(env.DATABASE_URL, env.DATABASE_POOL_MAX);
 const app = await buildApp({ env, db });
+// Background jobs. With several API servers, keep EMAIL_WORKER_ENABLED=true on all (safe) or just one.
 const stopEmailWorker = env.EMAIL_WORKER_ENABLED ? startEmailWorker(db, env, app.log) : () => undefined;
+const stopCleanupJob = env.EMAIL_WORKER_ENABLED ? startCleanupJob(db, app.log) : () => undefined;
 
 let shuttingDown = false;
 async function shutdown(signal: string) {
@@ -14,6 +17,7 @@ async function shutdown(signal: string) {
   shuttingDown = true;
   app.log.info({ signal }, 'shutting down');
   stopEmailWorker();
+  stopCleanupJob();
   await app.close();
   await db.destroy();
   process.exit(0);

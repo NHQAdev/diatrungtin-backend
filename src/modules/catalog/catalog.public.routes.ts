@@ -3,7 +3,7 @@ import { sql } from 'kysely';
 import { z } from 'zod';
 import type { Db } from '../../db/client.js';
 import { notFound } from '../../lib/errors.js';
-import { PaginationQuery, pageMeta, SlugParam } from '../../lib/http.js';
+import { PaginationQuery, pageMeta, SlugParam, unaccentPattern } from '../../lib/http.js';
 import { getOptionalCustomer, priceTierFor } from '../customer-auth/customer-session.js';
 import { availableQuantity, extraBeadPriceFor, unitPriceFor } from './pricing.js';
 
@@ -23,11 +23,6 @@ const ProductListQuery = PaginationQuery.extend({
   inStock: z.enum(['true', 'false']).optional(),
   sort: z.enum(['newest', 'price_asc', 'price_desc', 'name_asc']).default('newest'),
 });
-
-/** Escape % and _ so user input is matched literally inside ILIKE. */
-function likePattern(text: string): string {
-  return `%${text.replace(/[\\%_]/g, (char) => `\\${char}`)}%`;
-}
 
 export function catalogPublicRoutes(deps: { db: Db }) {
   const { db } = deps;
@@ -93,7 +88,7 @@ export function catalogPublicRoutes(deps: { db: Db }) {
         // A product with no active variant cannot be bought: do not list it.
         .where(sql<boolean>`exists (select 1 from product_variants v where v.product_id = p.id and v.status = 'active')`);
 
-      if (query.q) base = base.where('p.name', 'ilike', likePattern(query.q));
+      if (query.q) base = base.where(sql<boolean>`p.search_text like ${unaccentPattern(query.q)}`);
       if (query.category) {
         const slug = query.category;
         // Match the category itself and its direct children (e.g. "Nhang" includes "Nhang cây", "Nhang nụ").
