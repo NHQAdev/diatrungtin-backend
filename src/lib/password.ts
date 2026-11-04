@@ -28,8 +28,10 @@ export async function hashPassword(password: string): Promise<string> {
 
 export async function verifyPassword(password: string, stored: string): Promise<boolean> {
   const parts = stored.split('$');
-  if (parts.length !== 6 || parts[0] !== 'scrypt') return false;
-  const [, nRaw, rRaw, pRaw, saltRaw, hashRaw] = parts;
+  if (parts.length !== 6) return false;
+  const [scheme, nRaw, rRaw, pRaw, saltRaw, hashRaw] = parts;
+  // Checking each part (not just the length) also narrows the types from `string | undefined` to `string`.
+  if (scheme !== 'scrypt' || !nRaw || !rRaw || !pRaw || !saltRaw || !hashRaw) return false;
   const n = Number(nRaw);
   const r = Number(rRaw);
   const p = Number(pRaw);
