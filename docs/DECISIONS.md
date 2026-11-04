@@ -12,12 +12,14 @@ Cập nhật: 2026-11-04. Nguồn: bản "Phân tích BA sơ bộ — Trầm Hư
 | D4 | Quy tắc thương mại bắt buộc: SKU duy nhất; tiền VNĐ số nguyên; server tự tính tiền; tạo đơn nguyên tử; không bán vượt tồn; idempotency có ràng buộc DB, cùng khóa khác nội dung bị từ chối; hủy và hoàn tồn đúng một lần; tách trạng thái đơn/thanh toán/giao hàng; "đã giao" không đồng nghĩa "đã nhận tiền"; không có API công khai tự đánh dấu đã thanh toán; lỗi gửi email không làm mất đơn. | Áp dụng khi làm module catalog và order. |
 | D5 | Cho phép đặt hàng không cần tài khoản (khách vãng lai). Bắt buộc có **số điện thoại và email**. | Đơn không bắt buộc gắn tài khoản; lưu SĐT và email người đặt. Email dùng để gửi xác nhận đơn. |
 | D6 | Thanh toán bản đầu: **chỉ COD**. | Đơn tạo ra ở trạng thái thanh toán `unpaid`; admin ghi nhận đã thu tiền sau khi giao. Không có API công khai đổi trạng thái thanh toán. Chuyển khoản để sau. |
+| D7 | Có tài khoản khách hàng, gồm hai loại: **khách cá nhân** và **khách business**. Khách vãng lai vẫn đặt được hàng (D5). | Bảng tài khoản khách riêng với admin, có trường loại tài khoản; đơn hàng gắn tài khoản nếu khách đăng nhập. Phần khác biệt của khách business chờ Q5–Q6. |
 
 ## Đang chờ trả lời (không coi là đã duyệt)
 
 | # | Câu hỏi | Đề xuất | Chặn phần nào |
 |---|---|---|---|
-| Q4 | Bản đầu có cần tài khoản khách hàng (đăng ký, xem lịch sử đơn) không, hay chỉ khách vãng lai? | Chỉ khách vãng lai. Tra cứu đơn bằng mã đơn + SĐT hoặc email; hủy đơn (khi còn chờ xác nhận) qua liên kết bí mật trong email xác nhận. | API khách, module tài khoản |
+| Q5 | Khách business khác khách cá nhân ở điểm nào: chỉ thông tin xuất hóa đơn (tên công ty, MST), hay có giá sỉ/chiết khấu riêng? | Bản đầu: chỉ thông tin hóa đơn, giá như khách cá nhân. Giá sỉ để giai đoạn sau (đang nằm trong D3). | Model tài khoản, tính giá |
+| Q6 | Tài khoản business có cần admin duyệt trước khi dùng không? | Không cần nếu chỉ khác thông tin hóa đơn; cần duyệt nếu có giá riêng. | Luồng đăng ký, API admin |
 
 ## Giả định đang dùng
 
