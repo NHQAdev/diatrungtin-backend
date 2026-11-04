@@ -22,6 +22,10 @@ Cập nhật: 2026-11-04.
 ## Tiếp theo
 
 1. Mở quyền npm → cài đặt → typecheck → chạy toàn bộ test → sửa lỗi.
-2. Khi có trả lời Q1–Q3 (`DECISIONS.md`): module danh mục/bộ sưu tập/sản phẩm/phiên bản.
-3. Checkout, đơn hàng, tồn kho, idempotency, test đặt hàng đồng thời.
-4. Thanh toán thủ công, giao hàng, cấu hình cửa hàng.
+2. Module danh mục/bộ sưu tập/sản phẩm/phiên bản (có giá và giới hạn "thêm hạt" theo D2).
+3. Checkout khách vãng lai (SĐT + email bắt buộc), đơn hàng COD, tồn kho, idempotency, test đặt hàng đồng thời.
+4. Ghi nhận thu tiền COD, giao hàng, cấu hình cửa hàng.
+
+## Ghi chú môi trường
+
+- Thay đổi quyền mạng (npm) chỉ áp dụng cho phiên làm việc mới; phiên hiện tại vẫn bị chặn.
