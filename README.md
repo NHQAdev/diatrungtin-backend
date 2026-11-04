@@ -20,6 +20,7 @@ cp .env.example .env              # sửa DATABASE_URL, TEST_DATABASE_URL
 # 3. Cài đặt và migrate
 npm install
 npm run db:migrate
+npm run db:seed                   # danh mục, tag và 2 sản phẩm [Mẫu] để thử
 
 # 4. Tạo tài khoản quản trị (sẽ hỏi mật khẩu, tối thiểu 12 ký tự)
 npm run admin -- create --email owner@example.com --name "Chủ cửa hàng"
@@ -35,6 +36,15 @@ docker run -d --name dtt-postgres -e POSTGRES_USER=dtt -e POSTGRES_PASSWORD=chan
   -e POSTGRES_DB=dtt_dev -p 5432:5432 postgres:16
 docker exec dtt-postgres createdb -U dtt dtt_test
 ```
+
+## Sau khi chạy lần đầu
+
+1. Đăng nhập admin, đặt phí giao hàng (bắt buộc trước khi khách đặt được hàng):
+   `PUT /api/admin/store-settings` với `{ "shippingFee": 30000, "freeShippingThreshold": null }` (con số ví dụ; điền theo chính sách thật).
+2. Khi chưa cấu hình SMTP, email (xác nhận đơn, đặt lại mật khẩu…) được in ra log của `npm run dev`.
+3. Ảnh upload được lưu trong thư mục `uploads/` (đã nằm trong `.gitignore`).
+
+Danh sách API đầy đủ: [docs/API.md](docs/API.md).
 
 ## Kiểm tra
 
@@ -55,4 +65,4 @@ Tự động hóa (CI, lần triển khai đầu): đặt `ADMIN_PASSWORD` trong
 
 ## Triển khai (tóm tắt)
 
-`npm ci && npm run build && npm run db:migrate && npm start`, với `NODE_ENV=production`, `CORS_ORIGINS` là domain frontend, `TRUST_PROXY=true` nếu chạy sau reverse proxy. Health check: `/health/ready`.
+`npm ci && npm run build && npm run db:migrate && npm start` (không chạy `db:seed` trên production), với `NODE_ENV=production`, `CORS_ORIGINS` là domain frontend, `TRUST_PROXY=true` nếu chạy sau reverse proxy. Health check: `/health/ready`.

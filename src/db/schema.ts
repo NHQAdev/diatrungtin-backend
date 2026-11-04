@@ -1,16 +1,26 @@
 import type { ColumnType, Generated, Insertable, Selectable } from 'kysely';
 
 // Hand-written to mirror db/migrations/*.sql. Update together with every migration.
+//
+// ColumnType<SelectType, InsertType, UpdateType>
+// - Generated<T>: the database fills it in (id, identity columns).
+// - Columns with a DEFAULT use `T | undefined` as insert type so they can be left out.
 
 type Timestamp = ColumnType<Date, Date | string | undefined, Date | string>;
+type NullableTimestamp = ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+type WithDefault<T> = ColumnType<T, T | undefined, T>;
+// jsonb: read as a parsed value, written as a JSON string.
+type Json<T> = ColumnType<T, string | undefined, string>;
+
+// ---------- 0001 admin auth ----------
 
 export interface AdminUsersTable {
   id: Generated<string>;
   email: string;
   display_name: string;
   password_hash: string;
-  status: ColumnType<'active' | 'disabled', 'active' | 'disabled' | undefined>;
-  last_login_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  status: WithDefault<'active' | 'disabled'>;
+  last_login_at: NullableTimestamp;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -24,26 +34,330 @@ export interface AdminSessionsTable {
   created_at: Timestamp;
   last_seen_at: Timestamp;
   expires_at: ColumnType<Date, Date | string, Date | string>;
-  revoked_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+  revoked_at: NullableTimestamp;
 }
 
 export interface AuditLogsTable {
-  id: Generated<string>;
+  id: Generated<number>;
   actor_type: 'admin' | 'system' | 'anonymous';
   actor_id: string | null;
   action: string;
   entity_type: string | null;
   entity_id: string | null;
   ip_address: string | null;
-  metadata: ColumnType<Record<string, unknown>, string | undefined, string>;
+  metadata: Json<Record<string, unknown>>;
   created_at: Timestamp;
+}
+
+// ---------- 0002 catalog ----------
+
+export interface CategoriesTable {
+  id: Generated<string>;
+  parent_id: string | null;
+  name: string;
+  slug: string;
+  description: string | null;
+  sort_order: WithDefault<number>;
+  is_visible: WithDefault<boolean>;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface CollectionsTable {
+  id: Generated<string>;
+  name: string;
+  slug: string;
+  description: string | null;
+  image_url: string | null;
+  sort_order: WithDefault<number>;
+  is_visible: WithDefault<boolean>;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export type TagType = 'audience' | 'need';
+
+export interface TagsTable {
+  id: Generated<string>;
+  type: TagType;
+  name: string;
+  slug: string;
+  sort_order: WithDefault<number>;
+  created_at: Timestamp;
+}
+
+export type ProductStatus = 'draft' | 'active' | 'hidden';
+export interface ProductSpec {
+  label: string;
+  value: string;
+}
+
+export interface ProductsTable {
+  id: Generated<string>;
+  category_id: string;
+  name: string;
+  slug: string;
+  short_description: string | null;
+  description: string | null;
+  material: string | null;
+  specs: Json<ProductSpec[]>;
+  usage_guide: string | null;
+  status: WithDefault<ProductStatus>;
+  seo_title: string | null;
+  seo_description: string | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface ProductImagesTable {
+  id: Generated<string>;
+  product_id: string;
+  url: string;
+  alt: string | null;
+  sort_order: WithDefault<number>;
+}
+
+export interface ProductCollectionsTable {
+  product_id: string;
+  collection_id: string;
+  sort_order: WithDefault<number>;
+}
+
+export interface ProductTagsTable {
+  product_id: string;
+  tag_id: string;
+}
+
+export type VariantOptions = Record<string, string | number>;
+
+export interface ProductVariantsTable {
+  id: Generated<string>;
+  product_id: string;
+  sku: string;
+  name: string;
+  options: Json<VariantOptions>;
+  retail_price: number;
+  business_price: number | null;
+  stock: WithDefault<number>;
+  max_extra_beads: WithDefault<number>;
+  extra_bead_price: number | null;
+  business_extra_bead_price: number | null;
+  status: WithDefault<'active' | 'hidden'>;
+  sort_order: WithDefault<number>;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export type InventoryReason = 'initial' | 'admin_adjustment' | 'order_placed' | 'order_cancelled' | 'order_returned';
+
+export interface InventoryMovementsTable {
+  id: Generated<number>;
+  variant_id: string;
+  change: number;
+  stock_after: number;
+  reason: InventoryReason;
+  order_id: string | null;
+  admin_user_id: string | null;
+  note: string | null;
+  created_at: Timestamp;
+}
+
+// ---------- 0003 customers ----------
+
+export type AccountType = 'personal' | 'business';
+export type BusinessStatus = 'pending' | 'approved' | 'rejected';
+
+export interface CustomersTable {
+  id: Generated<string>;
+  email: string;
+  password_hash: string;
+  full_name: string;
+  phone: string;
+  account_type: AccountType;
+  status: WithDefault<'active' | 'disabled'>;
+  business_status: BusinessStatus | null;
+  company_name: string | null;
+  tax_code: string | null;
+  invoice_address: string | null;
+  business_reviewed_at: NullableTimestamp;
+  business_reviewed_by: string | null;
+  business_rejection_reason: string | null;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface CustomerSessionsTable {
+  id: Generated<string>;
+  customer_id: string;
+  token_hash: Buffer;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: Timestamp;
+  last_seen_at: Timestamp;
+  expires_at: ColumnType<Date, Date | string, Date | string>;
+  revoked_at: NullableTimestamp;
+}
+
+export interface PasswordResetTokensTable {
+  id: Generated<string>;
+  customer_id: string;
+  token_hash: Buffer;
+  expires_at: ColumnType<Date, Date | string, Date | string>;
+  used_at: NullableTimestamp;
+  created_at: Timestamp;
+}
+
+// ---------- 0004 orders ----------
+
+export type PriceTier = 'retail' | 'business';
+export type OrderStatus = 'pending' | 'confirmed' | 'completed' | 'cancelled';
+export type PaymentStatus = 'unpaid' | 'paid' | 'refunded';
+export type FulfillmentStatus = 'unfulfilled' | 'packing' | 'shipped' | 'delivered' | 'returned';
+
+export interface OrdersTable {
+  id: Generated<string>;
+  code: string;
+  customer_id: string | null;
+  customer_name: string;
+  phone: string;
+  email: string;
+  shipping_province: string;
+  shipping_ward: string;
+  shipping_address_line: string;
+  note: string | null;
+  price_tier: PriceTier;
+  invoice_requested: WithDefault<boolean>;
+  invoice_company_name: string | null;
+  invoice_tax_code: string | null;
+  invoice_address: string | null;
+  subtotal: number;
+  shipping_fee: number;
+  discount_total: WithDefault<number>;
+  total: number;
+  order_status: WithDefault<OrderStatus>;
+  payment_status: WithDefault<PaymentStatus>;
+  fulfillment_status: WithDefault<FulfillmentStatus>;
+  payment_method: WithDefault<'cod'>;
+  carrier: string | null;
+  tracking_number: string | null;
+  cancel_reason: string | null;
+  stock_restored_at: NullableTimestamp;
+  access_token_hash: Buffer;
+  confirmed_at: NullableTimestamp;
+  shipped_at: NullableTimestamp;
+  delivered_at: NullableTimestamp;
+  paid_at: NullableTimestamp;
+  completed_at: NullableTimestamp;
+  cancelled_at: NullableTimestamp;
+  created_at: Timestamp;
+  updated_at: Timestamp;
+}
+
+export interface OrderItemsTable {
+  id: Generated<string>;
+  order_id: string;
+  variant_id: string;
+  product_id: string;
+  product_name: string;
+  variant_name: string;
+  sku: string;
+  options: Json<VariantOptions>;
+  image_url: string | null;
+  unit_price: number;
+  extra_beads: WithDefault<number>;
+  extra_bead_unit_price: WithDefault<number>;
+  quantity: number;
+  line_total: number;
+}
+
+export type OrderActorType = 'admin' | 'customer' | 'guest' | 'system';
+
+export interface OrderEventsTable {
+  id: Generated<number>;
+  order_id: string;
+  actor_type: OrderActorType;
+  actor_id: string | null;
+  action: string;
+  order_status: string;
+  payment_status: string;
+  fulfillment_status: string;
+  note: string | null;
+  created_at: Timestamp;
+}
+
+export interface IdempotencyKeysTable {
+  scope: string;
+  key: string;
+  request_hash: string;
+  order_id: string | null;
+  created_at: Timestamp;
+}
+
+export interface EmailOutboxTable {
+  id: Generated<number>;
+  to_email: string;
+  subject: string;
+  body_text: string;
+  status: WithDefault<'pending' | 'sent' | 'failed'>;
+  attempts: WithDefault<number>;
+  last_error: string | null;
+  send_after: Timestamp;
+  created_at: Timestamp;
+  sent_at: NullableTimestamp;
+}
+
+// ---------- 0005 store ----------
+
+export interface StoreSettingsTable {
+  id: WithDefault<number>;
+  store_name: WithDefault<string>;
+  hotline: string | null;
+  email: string | null;
+  address: string | null;
+  business_info: string | null;
+  facebook_url: string | null;
+  zalo_url: string | null;
+  shipping_fee: number | null;
+  free_shipping_threshold: number | null;
+  updated_at: Timestamp;
+}
+
+export interface PagesTable {
+  id: Generated<string>;
+  slug: string;
+  title: string;
+  content: WithDefault<string>;
+  is_published: WithDefault<boolean>;
+  created_at: Timestamp;
+  updated_at: Timestamp;
 }
 
 export interface Database {
   admin_users: AdminUsersTable;
   admin_sessions: AdminSessionsTable;
   audit_logs: AuditLogsTable;
+  categories: CategoriesTable;
+  collections: CollectionsTable;
+  tags: TagsTable;
+  products: ProductsTable;
+  product_images: ProductImagesTable;
+  product_collections: ProductCollectionsTable;
+  product_tags: ProductTagsTable;
+  product_variants: ProductVariantsTable;
+  inventory_movements: InventoryMovementsTable;
+  customers: CustomersTable;
+  customer_sessions: CustomerSessionsTable;
+  password_reset_tokens: PasswordResetTokensTable;
+  orders: OrdersTable;
+  order_items: OrderItemsTable;
+  order_events: OrderEventsTable;
+  idempotency_keys: IdempotencyKeysTable;
+  email_outbox: EmailOutboxTable;
+  store_settings: StoreSettingsTable;
+  pages: PagesTable;
 }
 
 export type AdminUser = Selectable<AdminUsersTable>;
+export type Customer = Selectable<CustomersTable>;
+export type Order = Selectable<OrdersTable>;
 export type NewAuditLog = Insertable<AuditLogsTable>;

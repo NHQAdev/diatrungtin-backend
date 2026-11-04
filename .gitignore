@@ -6,3 +6,6 @@ coverage/
 !.env.example
 *.log
 .DS_Store
+/uploads/
+cookie.txt
+login.json

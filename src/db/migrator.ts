@@ -35,12 +35,17 @@ export async function runMigrations(connectionString: string, migrationsDir: str
     const result: MigrationResult = { applied: [], skipped: [] };
 
     for (const file of files) {
-      const sql = await readFile(path.join(migrationsDir, file), 'utf8');
+      const rawSql = await readFile(path.join(migrationsDir, file), 'utf8');
+      // Windows checkouts may turn LF into CRLF. Hash with LF line endings so the same migration
+      // has the same checksum on every machine.
+      const sql = rawSql.replace(/\r\n/g, '\n');
       const checksum = createHash('sha256').update(sql).digest('hex');
+      // Checksum computed the old way (raw bytes), for databases migrated before this fix.
+      const legacyChecksum = createHash('sha256').update(rawSql).digest('hex');
       const previous = done.get(file);
 
       if (previous !== undefined) {
-        if (previous !== checksum) {
+        if (previous !== checksum && previous !== legacyChecksum) {
           throw new Error(`Migration ${file} was modified after being applied. Create a new migration instead.`);
         }
         result.skipped.push(file);
