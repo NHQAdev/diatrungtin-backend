@@ -28,8 +28,14 @@ export async function createTestContext(): Promise<{ app: FastifyInstance; db: D
   };
 }
 
+/** Empties every table and puts store settings back to their defaults (no shipping fee). */
 export async function resetData(db: Db): Promise<void> {
-  await sql`TRUNCATE admin_sessions, admin_users, audit_logs RESTART IDENTITY CASCADE`.execute(db);
+  await sql`TRUNCATE
+    order_events, order_items, idempotency_keys, orders, email_outbox, inventory_movements,
+    product_variants, product_images, product_tags, product_collections, products, tags, collections, categories,
+    password_reset_tokens, customer_sessions, customers, pages, admin_sessions, admin_users, audit_logs
+    RESTART IDENTITY CASCADE`.execute(db);
+  await sql`UPDATE store_settings SET shipping_fee = NULL, free_shipping_threshold = NULL, hotline = NULL WHERE id = 1`.execute(db);
 }
 
 export async function createAdmin(db: Db, email = 'owner@example.com', password = 'correct horse battery') {
