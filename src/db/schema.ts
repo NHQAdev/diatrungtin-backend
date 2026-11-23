@@ -184,6 +184,7 @@ export interface CustomersTable {
   business_reviewed_at: NullableTimestamp;
   business_reviewed_by: string | null;
   business_rejection_reason: string | null;
+  email_verified_at: NullableTimestamp;
   created_at: Timestamp;
   updated_at: Timestamp;
 }
@@ -206,6 +207,19 @@ export interface PasswordResetTokensTable {
   token_hash: Buffer;
   expires_at: ColumnType<Date, Date | string, Date | string>;
   used_at: NullableTimestamp;
+  created_at: Timestamp;
+}
+
+// ---------- 0007 email verification ----------
+
+export interface EmailVerificationCodesTable {
+  id: Generated<string>;
+  customer_id: string;
+  email: string;
+  code_hash: Buffer;
+  attempts: WithDefault<number>;
+  expires_at: ColumnType<Date, Date | string, Date | string>;
+  consumed_at: NullableTimestamp;
   created_at: Timestamp;
 }
 
@@ -350,6 +364,7 @@ export interface Database {
   customers: CustomersTable;
   customer_sessions: CustomerSessionsTable;
   password_reset_tokens: PasswordResetTokensTable;
+  email_verification_codes: EmailVerificationCodesTable;
   orders: OrdersTable;
   order_items: OrderItemsTable;
   order_events: OrderEventsTable;

@@ -3,6 +3,7 @@ import { sql } from 'kysely';
 import { z } from 'zod';
 import type { Env } from '../../config/env.js';
 import type { Db } from '../../db/client.js';
+import { conflict } from '../../lib/errors.js';
 import { emailSchema, phoneSchema } from '../../lib/http.js';
 import {
   changePassword,
@@ -13,6 +14,7 @@ import {
   resetPassword,
 } from './customer-auth.service.js';
 import { CUSTOMER_SESSION_COOKIE, customerProfile, findCustomerBySessionToken, requireCustomer } from './customer-session.js';
+import { changeUnverifiedEmail, getVerificationStatus, issueVerificationCode, verifyEmailCode } from './email-verification.service.js';
 
 const newPassword = z
   .string()
@@ -89,6 +91,31 @@ export function customerAuthRoutes(deps: { db: Db; env: Env }) {
 
     app.get('/auth/me', { preHandler: requireCustomer(db) }, async (request) => {
       return { data: { customer: customerProfile(request.customer!) } };
+    });
+
+    // ---------- Email verification (D10) ----------
+
+    app.get('/auth/email-verification', { preHandler: requireCustomer(db) }, async (request) => {
+      return { data: await getVerificationStatus(db, request.customer!) };
+    });
+
+    app.post('/auth/email-verification/verify', { preHandler: requireCustomer(db), config: { rateLimit: { max: 20, timeWindow: '15 minutes' } } }, async (request) => {
+      const { code } = z.object({ code: z.string().trim().regex(/^[0-9]{6}$/, 'Mã xác minh gồm 6 chữ số.') }).parse(request.body);
+      await verifyEmailCode(db, request.customer!, code);
+      return { data: { customer: await profileFromToken(request.cookies[CUSTOMER_SESSION_COOKIE]!) } };
+    });
+
+    app.post('/auth/email-verification/resend', { preHandler: requireCustomer(db), config: { rateLimit: { max: 10, timeWindow: '15 minutes' } } }, async (request) => {
+      const customer = request.customer!;
+      if (customer.emailVerified) throw conflict('Email đã được xác minh.');
+      const sent = await issueVerificationCode(db, customer, { enforceLimits: true });
+      return { data: { ...sent, email: customer.email } };
+    });
+
+    app.patch('/auth/email-verification/email', { preHandler: requireCustomer(db), config: { rateLimit: { max: 10, timeWindow: '1 hour' } } }, async (request) => {
+      const { email } = z.object({ email: emailSchema }).parse(request.body);
+      const sent = await changeUnverifiedEmail(db, request.customer!, email);
+      return { data: { ...sent, customer: await profileFromToken(request.cookies[CUSTOMER_SESSION_COOKIE]!) } };
     });
 
     app.post('/auth/forgot-password', { config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } }, async (request) => {

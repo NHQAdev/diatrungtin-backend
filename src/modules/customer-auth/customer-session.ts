@@ -18,6 +18,7 @@ export interface CurrentCustomer {
   companyName: string | null;
   taxCode: string | null;
   invoiceAddress: string | null;
+  emailVerified: boolean;
 }
 
 declare module 'fastify' {
@@ -40,6 +41,7 @@ export function toCurrentCustomer(row: Customer, sessionId: string): CurrentCust
     companyName: row.company_name,
     taxCode: row.tax_code,
     invoiceAddress: row.invoice_address,
+    emailVerified: row.email_verified_at !== null,
   };
 }
 

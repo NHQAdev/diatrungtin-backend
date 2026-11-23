@@ -16,6 +16,7 @@ export interface CleanupResult {
   adminSessions: number;
   customerSessions: number;
   resetTokens: number;
+  verificationCodes: number;
   idempotencyKeys: number;
   sentEmails: number;
 }
@@ -37,6 +38,10 @@ export async function runCleanup(db: Db): Promise<CleanupResult> {
     .deleteFrom('password_reset_tokens')
     .where((eb) => eb.or([eb('expires_at', '<', daysAgo(RETENTION.resetTokensDays)), eb('used_at', '<', daysAgo(RETENTION.resetTokensDays))]))
     .executeTakeFirst();
+  const verificationCodes = await db
+    .deleteFrom('email_verification_codes')
+    .where('expires_at', '<', daysAgo(RETENTION.resetTokensDays))
+    .executeTakeFirst();
   const idempotencyKeys = await db.deleteFrom('idempotency_keys').where('created_at', '<', daysAgo(RETENTION.idempotencyKeysDays)).executeTakeFirst();
   const sentEmails = await db
     .deleteFrom('email_outbox')
@@ -48,6 +53,7 @@ export async function runCleanup(db: Db): Promise<CleanupResult> {
     adminSessions: count(adminSessions),
     customerSessions: count(customerSessions),
     resetTokens: count(resetTokens),
+    verificationCodes: count(verificationCodes),
     idempotencyKeys: count(idempotencyKeys),
     sentEmails: count(sentEmails),
   };

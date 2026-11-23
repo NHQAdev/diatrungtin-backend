@@ -133,7 +133,7 @@ describe('password reset', () => {
   it('resets with the emailed token exactly once and logs out old sessions', async () => {
     const { cookie } = await registerCustomer(app, { email: 'reset@example.com' });
     await call(app, { method: 'POST', url: '/api/auth/forgot-password', payload: { email: 'reset@example.com' } });
-    const email = await db.selectFrom('email_outbox').select('body_text').executeTakeFirstOrThrow();
+    const email = await db.selectFrom('email_outbox').select('body_text').where('subject', 'like', 'Đặt lại mật khẩu%').executeTakeFirstOrThrow();
     const token = decodeURIComponent(/token=([^\s]+)/.exec(email.body_text)![1]!);
 
     const first = await call(app, { method: 'POST', url: '/api/auth/reset-password', payload: { token, password: 'mat khau moi 456' } });

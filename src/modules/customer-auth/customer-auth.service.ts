@@ -6,6 +6,7 @@ import { getDummyHash, hashPassword, verifyPassword } from '../../lib/password.j
 import { generateToken, hashToken } from '../../lib/tokens.js';
 import { enqueueEmail } from '../email/outbox.js';
 import { passwordResetEmail } from '../email/templates.js';
+import { issueVerificationCode } from './email-verification.service.js';
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
@@ -61,6 +62,8 @@ export async function registerCustomer(db: Db, input: RegisterInput, info: Sessi
       })
       .returning('id')
       .executeTakeFirstOrThrow();
+    // D10: the first verification code goes out right away (the email is queued, not sent inline).
+    await issueVerificationCode(db, { id: customer.id, email: input.email, fullName: input.fullName }, { enforceLimits: false });
     const session = await createSession(db, customer.id, info);
     return { customerId: customer.id, ...session };
   } catch (error) {

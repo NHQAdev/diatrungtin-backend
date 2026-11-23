@@ -15,6 +15,7 @@ Cập nhật: 2026-11-04. Nguồn: bản "Phân tích BA sơ bộ — Trầm Hư
 | D7 | Có tài khoản khách hàng, gồm hai loại: **khách cá nhân** và **khách business**. Khách vãng lai vẫn đặt được hàng (D5). | Bảng tài khoản khách riêng với admin, có trường loại tài khoản; đơn hàng gắn tài khoản nếu khách đăng nhập. |
 | D8 | Khách business có **thông tin xuất hóa đơn** (tên công ty, mã số thuế, địa chỉ xuất hóa đơn) và **giá sỉ hoặc chiết khấu riêng** theo bảng giá loại khách. | Thêm bảng giá theo loại khách. Backend tự xác định giá theo tài khoản đang đăng nhập; frontend không gửi loại giá. Dòng đơn lưu loại giá đã áp dụng. Đơn lưu bản chụp thông tin xuất hóa đơn tại thời điểm đặt. |
 | D9 | Tài khoản business phải được **admin duyệt** (kiểm tra mã số thuế) trước khi được áp giá business. | Trạng thái duyệt: chờ duyệt / đã duyệt / từ chối, có ghi người duyệt, thời điểm, lý do. Giá business chỉ áp dụng khi đã duyệt; mọi thao tác duyệt ghi audit log. |
+| D10 | Có bước **xác minh email bằng mã OTP khi đăng ký** tài khoản khách (cá nhân và business). (Xác nhận 05/11/2026.) | Đã làm (migration 0007): mã 6 số, hiệu lực 10 phút, sai tối đa 5 lần, gửi lại sau 60 giây, tối đa 5 mã/giờ; chỉ lưu hash. Tài khoản tạo trước tính năng được coi là đã xác minh. **Giả định:** khách chưa xác minh vẫn đăng nhập và mua hàng được; trang tài khoản nhắc xác minh. Chưa chặn admin duyệt business khi email chưa xác minh. |
 
 ## Đề xuất chờ xác nhận (không coi là đã duyệt)
 

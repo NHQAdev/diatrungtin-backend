@@ -17,6 +17,19 @@ export function passwordResetEmail(to: string, resetUrl: string): EmailMessage {
   };
 }
 
+export function emailVerificationEmail(to: string, fullName: string, code: string, ttlMinutes: number): EmailMessage {
+  return {
+    to,
+    subject: `${code} là mã xác minh email — Trầm Hương Địa Trung Tín`,
+    body:
+      `Chào ${fullName},\n\n` +
+      `Mã xác minh email của bạn là: ${code}\n\n` +
+      `Mã có hiệu lực trong ${ttlMinutes} phút. Không chia sẻ mã này với bất kỳ ai, kể cả người tự nhận là nhân viên cửa hàng.\n\n` +
+      'Nếu bạn không đăng ký tài khoản, hãy bỏ qua email này.' +
+      SIGNATURE,
+  };
+}
+
 export function businessReviewEmail(to: string, approved: boolean, reason?: string | null): EmailMessage {
   return {
     to,

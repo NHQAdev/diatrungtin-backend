@@ -47,7 +47,11 @@ Cookie `dtt_session` (30 ngày, SameSite=Lax).
 | POST | `/api/auth/register` | Cá nhân: `{ accountType: "personal", email, password (≥ 8), fullName, phone }`. Doanh nghiệp: thêm `accountType: "business", companyName, taxCode, invoiceAddress` → `businessStatus: "pending"`, chưa có giá business tới khi admin duyệt |
 | POST | `/api/auth/login` | `{ email, password }` — giới hạn 10 lần/15 phút/IP |
 | POST | `/api/auth/logout` | 204 |
-| GET | `/api/auth/me` | `{ customer: { id, email, fullName, phone, accountType, businessStatus, companyName, taxCode, invoiceAddress, priceTier } }` |
+| GET | `/api/auth/me` | `{ customer: { id, email, fullName, phone, accountType, businessStatus, companyName, taxCode, invoiceAddress, priceTier, emailVerified } }` |
+| GET | `/api/auth/email-verification` | (đăng nhập) `{ emailVerified, email, expiresAt \| null, resendAvailableAt }`. Không bao giờ trả mã. |
+| POST | `/api/auth/email-verification/verify` | `{ code: "6 chữ số" }` → `{ customer }`. Sai mã: 400 `VALIDATION_ERROR` (field `code`, báo số lần còn lại); mã hết hạn hoặc sai 5 lần: 400 `BAD_REQUEST` với `details.reason = "expired"`. Đã xác minh rồi thì trả 200. |
+| POST | `/api/auth/email-verification/resend` | Gửi mã mới (mã cũ hết hiệu lực) → `{ expiresAt, resendAvailableAt, email }`. Chờ 60 giây giữa hai lần, tối đa 5 mã/giờ: 429 `RATE_LIMITED` với `details.retryAfterSeconds`. Đã xác minh: 409. |
+| PATCH | `/api/auth/email-verification/email` | `{ email }` — sửa email gõ nhầm khi **chưa** xác minh, gửi mã tới email mới → `{ customer, expiresAt, resendAvailableAt }`. Email đã có tài khoản khác hoặc đã xác minh: 409. |
 | POST | `/api/auth/forgot-password` | `{ email }` — luôn trả cùng một thông báo; email chứa link `APP_PUBLIC_URL/dat-lai-mat-khau?token=…` (1 giờ, dùng 1 lần) |
 | POST | `/api/auth/reset-password` | `{ token, password }` — đăng xuất mọi thiết bị |
 | PATCH | `/api/account/profile` | `{ fullName?, phone? }` |
