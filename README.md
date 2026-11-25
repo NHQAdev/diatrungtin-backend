@@ -1,35 +1,83 @@
-# diatrungtin-backend
+# Địa Trung Tín — E-commerce Backend
 
-Backend MVP cho website Trầm Hương Địa Trung Tín. Node.js 22 + TypeScript, Fastify, PostgreSQL, Kysely.
+REST API for **Trầm Hương Địa Trung Tín**, an online store selling agarwood (trầm hương) jewelry and incense. It serves both the customer storefront (`/api/*`) and the admin dashboard (`/api/admin/*`).
 
-Tài liệu: [quyết định nghiệp vụ](docs/DECISIONS.md) · [kiến trúc](docs/ARCHITECTURE.md) · [API](docs/API.md) · [tiến độ](docs/PROGRESS.md)
+Frontend: [diatrungtin-frontend](https://github.com/NHQAdev/diatrungtin-frontend)
 
-## Chạy local
+> 🚧 **Status: in development.** All MVP backend modules are implemented and covered by integration tests. Production deployment and online payments are not done yet. See [Roadmap](#roadmap).
 
-Cần Node.js ≥ 22.12 và PostgreSQL ≥ 16.
+## Tech stack
+
+| Area | Choice |
+|---|---|
+| Runtime | Node.js 22, TypeScript (ESM) |
+| HTTP | Fastify 5 (cookie, CORS, helmet, rate-limit, multipart) |
+| Database | PostgreSQL 16, Kysely query builder, plain SQL migrations |
+| Validation | Zod (environment variables and requests) |
+| Testing | Vitest integration tests against a real PostgreSQL database |
+| Email | Nodemailer with a database outbox and background worker |
+| Deployment | Docker, Docker Compose, Caddy (HTTPS), backup/restore scripts |
+
+## Highlights
+
+- **Server-side pricing**: retail vs. approved-business price tiers are decided only on the server; the client never sends prices.
+- **Safe ordering**: an order is created in one transaction with row locks, so stock can never be oversold; idempotency keys are enforced by a database constraint.
+- **Order state machine** with separate order, payment and delivery states; cancelling restores stock exactly once.
+- **Security**: random session tokens stored as SHA-256 hashes, HttpOnly/SameSite cookies, login rate limiting, origin checks on admin writes, audit log.
+- **Vietnamese search** that ignores diacritics (e.g. "tram huong" finds "trầm hương").
+
+## Progress
+
+### ✅ Done
+- **Platform**: validated config, SQL migrations with checksums, health checks, unified error format, request logging with cookies masked.
+- **Admin auth**: cookie login/logout, CLI to create, reset or disable admins, audit log.
+- **Catalog**: category tree, collections, tags, products, images, specs, variants/SKUs, retail and business prices, "extra beads" option for bracelets, stock with history, image upload.
+- **Customer accounts**: individual and business sign-up, **email OTP verification**, login, forgot/reset/change password, profile, business upgrade with admin approval.
+- **Checkout & orders**: server-side quote, guest checkout (phone + email), idempotent order creation, order lookup, cancellation by secret link or account.
+- **Order management (admin)**: list, filters, details with history, status changes, editing shipping info with a required reason, recording cash-on-delivery payments.
+- **Email**: order confirmation and updates, password reset, business approval results, OTP codes; failed emails can be viewed and re-sent by admins.
+- **Store settings**: store info, flat shipping fee with free-shipping threshold, content/policy pages, admin dashboard stats.
+- **Maintenance**: cleanup job every 6 hours (expired sessions, tokens, idempotency keys, sent emails).
+- **Deployment setup**: Dockerfile, Docker Compose + Caddy, backup/restore scripts, deployment guide.
+
+### 🔄 Not yet verified
+- Running the full Docker Compose stack on a real VPS.
+- Sending email through a real SMTP server.
+
+### 🔜 Roadmap
+- Bank transfer and online payment gateway (the MVP supports cash on delivery only)
+- Vouchers, reviews, wishlist, blog
+- Shipping carrier integration
+- Staff roles with fine-grained permissions
+- Image storage on S3/R2, HTML email templates
+
+## Getting started
+
+Requires Node.js ≥ 22.12 and PostgreSQL ≥ 16.
 
 ```bash
-# 1. Tạo database (ví dụ với psql)
-createuser -P dtt                 # đặt mật khẩu cho user dtt
+# 1. Create the databases
+createuser -P dtt
 createdb -O dtt dtt_dev
 createdb -O dtt dtt_test
 
-# 2. Cấu hình
-cp .env.example .env              # sửa DATABASE_URL, TEST_DATABASE_URL
+# 2. Configure
+cp .env.example .env              # set DATABASE_URL and TEST_DATABASE_URL
 
-# 3. Cài đặt và migrate
+# 3. Install and migrate
 npm install
 npm run db:migrate
-npm run db:seed                   # danh mục, tag và 2 sản phẩm [Mẫu] để thử
+npm run db:seed                   # categories, tags and 2 sample products
+npm run db:seed:demo              # optional: demo catalog with product photos
 
-# 4. Tạo tài khoản quản trị (sẽ hỏi mật khẩu, tối thiểu 12 ký tự)
-npm run admin -- create --email owner@example.com --name "Chủ cửa hàng"
+# 4. Create an admin account (asks for a password, min. 12 characters)
+npm run admin -- create --email owner@example.com --name "Owner"
 
-# 5. Chạy
+# 5. Run
 npm run dev                       # http://localhost:4000/health
 ```
 
-Có Docker thì có thể thay bước 1 bằng:
+With Docker, step 1 can be replaced by:
 
 ```bash
 docker run -d --name dtt-postgres -e POSTGRES_USER=dtt -e POSTGRES_PASSWORD=change_me \
@@ -37,34 +85,27 @@ docker run -d --name dtt-postgres -e POSTGRES_USER=dtt -e POSTGRES_PASSWORD=chan
 docker exec dtt-postgres createdb -U dtt dtt_test
 ```
 
-## Sau khi chạy lần đầu
+After the first run, set the shipping fee as admin (`PUT /api/admin/store-settings`) before placing orders. Without SMTP settings, emails are printed to the dev server log.
 
-1. Đăng nhập admin, đặt phí giao hàng (bắt buộc trước khi khách đặt được hàng):
-   `PUT /api/admin/store-settings` với `{ "shippingFee": 30000, "freeShippingThreshold": null }` (con số ví dụ; điền theo chính sách thật).
-2. Khi chưa cấu hình SMTP, email (xác nhận đơn, đặt lại mật khẩu…) được in ra log của `npm run dev`.
-3. Ảnh upload được lưu trong thư mục `uploads/` (đã nằm trong `.gitignore`).
-
-Danh sách API đầy đủ: [docs/API.md](docs/API.md).
-
-## Kiểm tra
+## Tests
 
 ```bash
 npm run typecheck
-npm test          # dùng TEST_DATABASE_URL; schema của DB test bị xóa và tạo lại mỗi lần chạy
+npm test          # uses TEST_DATABASE_URL; the test schema is recreated on every run
 ```
 
-## Quản lý tài khoản quản trị
+## Admin accounts
 
 ```bash
-npm run admin -- create --email a@b.vn --name "Tên"
-npm run admin -- reset-password --email a@b.vn   # thu hồi mọi phiên cũ
-npm run admin -- disable --email a@b.vn          # khóa và thu hồi mọi phiên
+npm run admin -- create --email a@b.vn --name "Name"
+npm run admin -- reset-password --email a@b.vn   # revokes all sessions
+npm run admin -- disable --email a@b.vn          # locks the account and revokes all sessions
 ```
 
-Tự động hóa (CI, lần triển khai đầu): đặt `ADMIN_PASSWORD` trong môi trường thay vì nhập tay. Không ghi mật khẩu vào file hay lịch sử shell.
+## Deployment
 
-## Triển khai
+VPS deployment with Docker Compose (PostgreSQL + API + Caddy HTTPS), including backup and restore: see [docs/DEPLOY.md](docs/DEPLOY.md).
 
-Lên VPS bằng Docker Compose (PostgreSQL + API + Caddy HTTPS), kèm sao lưu/khôi phục: xem [docs/DEPLOY.md](docs/DEPLOY.md).
+## Documentation (Vietnamese)
 
-Không dùng Docker: `npm ci && npm run build && npm run db:migrate:prod && npm start` (tạo admin: `npm run admin:prod -- create …`), với `NODE_ENV=production`. Không chạy `db:seed` trên production.
+[Architecture](docs/ARCHITECTURE.md) · [API](docs/API.md) · [Business decisions](docs/DECISIONS.md) · [Email setup](docs/EMAIL.md) · [Progress log](docs/PROGRESS.md)
